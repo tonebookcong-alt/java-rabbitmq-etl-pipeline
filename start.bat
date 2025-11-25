@@ -1,40 +1,40 @@
 @echo off
 chcp 65001 >nul
-title HE THONG TICH HOP DU LIEU (FINAL VERSION)
+title Hệ Thống Tích Hợp Dữ Liệu
 color 0E
 
 echo =================================================
-echo   BUOC 1: KHOI DONG HA TANG (DOCKER)
+echo  Bước 1: Khởi động hạ tầng (Docker) 
 echo =================================================
 
-echo Dang kiem tra Docker...
+echo Đang kiểm tra docker...
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
     color 0C
-    echo [LOI] Docker chua bat! Hay bat Docker Desktop truoc.
+    echo [LOI] Docker chưa bật hãy bật docker trước
     pause
     exit
 )
 
-echo [OK] Dang bat Container...
+echo [OK] Đang bật container...
 docker start rabbitmq-payroll
 docker start mysql-payroll
 
 echo.
 echo =================================================
-echo   BUOC 2: DON DEP DU LIEU CU (QUAN TRONG)
+echo   Bước 2: Dọn dẹp dữ liệu cũ
 echo =================================================
 echo.
 
-echo Dang xoa sach bang Staging de tranh trung lap ao...
-:: Lenh nay se xoa trang bang trung gian truoc khi nap moi
+echo Đang xóa sạch bảng Staging để tránh trùng lặp ảo...
+:: lệnh này sẽ xóa trắng bảng trung gian trước khi nạp mới
 docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "TRUNCATE TABLE staging_records;"
 
-echo [OK] Kho trung gian da sach se. San sang nap moi.
+echo [OK] Kho trung gian đã sạch sẽ. Sẵn sàng nạp mới.
 
 echo.
 echo =================================================
-echo   BUOC 3: CHAY CODE JAVA (ETL)
+echo   Bước 3: Chạy code Java (ETL)
 echo =================================================
 echo.
 
@@ -44,46 +44,46 @@ cd etl-rmq
 :: Kiem tra file JAR
 if not exist "target\etl-rmq-1.0-SNAPSHOT.jar" (
     color 0C
-    echo [LOI] Khong tim thay file JAR! Hay chay 'mvn package' lai.
+    echo [LOI] Không tìm thấy file JAR! Hãy chạy 'mvn package' lại.
     pause
     exit
 )
 
-echo 1. Dang khoi dong CONSUMER...
+echo 1. Đang khởi động CONSUMER...
 start "BEN NHAN (Consumer)" java -cp target/etl-rmq-1.0-SNAPSHOT.jar com.example.consumer.StagingConsumer
 
 echo.
-echo 2. Dang khoi dong PRODUCER...
+echo 2. Đang khởi động PRODUCER...
 java -cp target/etl-rmq-1.0-SNAPSHOT.jar com.example.RunProducer
 
 echo.
-echo    -> Cho 5 giay de du lieu nap vao DB...
+echo    -> Cho 5 giây để dữ liệu nạp vào DB...
 timeout /t 5 /nobreak >nul
 
 echo.
 echo =================================================
-echo   BUOC 4: XU LY LOGIC VA XUAT BAO CAO
+echo   Bước 4: Xử lý logic và xuất báo cáo
 echo =================================================
 echo.
 
-:: Chay file SQL xu ly
+:: Chạy file SQL xử lý
 docker exec -i mysql-payroll mysql -u root -p123456 payroll < process_data.sql
-echo [OK] Da loc trung va nap bang dich.
+echo [OK] Đã lọc trùng và nạp bảng đích.
 
-:: Tao thu muc ket_qua
+:: Tạo thư mục ket_qua
 if not exist "ket_qua" mkdir ket_qua
 
-echo 1. Xuat BaoCao_NhanVien.xls ...
+echo 1. Xuất BaoCao_NhanVien.xls ...
 docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM employees;" > ket_qua/BaoCao_NhanVien.xls
 
-echo 2. Xuat BaoCao_ChamCong.xls ...
+echo 2. Xuất BaoCao_ChamCong.xls ...
 docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM attendance;" > ket_qua/BaoCao_ChamCong.xls
 
-echo 3. Xuat BaoCao_Loi_TrungLap.xls ...
+echo 3. Xuất BaoCao_Loi_TrungLap.xls ...
 docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM dedup_duplicate;" > ket_qua/BaoCao_Loi_TrungLap.xls
 
 echo.
 echo =================================================
-echo   DA HOAN TAT! KIEM TRA THU MUC 'ket_qua'
+echo   ĐÃ HOÀN TẤT! KIỂM TRA THƯ MỤC 'ket_qua'
 echo =================================================
 pause
