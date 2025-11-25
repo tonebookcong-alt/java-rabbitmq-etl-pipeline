@@ -1,4 +1,0 @@
-business_key	record_type	conflict_count	sources	sample_payload
-E001|2025-10-01	attendance	2	["db_attendance", "db_attendance"]	{"emp_id": "E001", "check_in": "08:00:00", "ot_hours": 2.0, "check_out": "17:00:00", "work_date": "2025-10-01"}
-E001	employees	2	["csv_employees", "csv_employees"]	{"name": "Nhan Vien 1", "emp_id": "E001", "allowance": 4807879, "department": "Finance", "base_salary": 18467700}
-E002	employees	2	["csv_employees", "csv_employees"]	{"name": "Tran Thi B (Clone)", "emp_id": "E002", "allowance": 800000, "department": "HR", "base_salary": 12000000}
