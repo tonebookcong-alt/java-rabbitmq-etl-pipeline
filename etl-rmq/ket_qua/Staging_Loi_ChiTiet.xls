@@ -1,0 +1,4 @@
+id	source_name	record_type	business_key	hash_sha256	payload_json	status	error_msg	loaded_at
+297	db_attendance	attendance	BAD-ID-01	NO_HASH	BAD-ID-01|2025-10-01	INVALID	Sai dinh dang ID: BAD-ID-01	11/26/2025 1:58
+298	db_attendance	attendance	E@ERROR	NO_HASH	E@ERROR|2025-10-02	INVALID	Sai dinh dang ID: E@ERROR	11/26/2025 1:58
+299	db_attendance	attendance	NO_USER	NO_HASH	NO_USER|2025-10-03	INVALID	Sai dinh dang ID: NO_USER	11/26/2025 1:58

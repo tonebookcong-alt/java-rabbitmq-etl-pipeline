@@ -86,6 +86,8 @@ echo 4. Xuất BaoCao_TongHop_Full.xls (Mới) ...
 :: Lệnh này thực hiện JOIN 2 bảng và xuất ra file
 docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT e.emp_id AS 'Ma NV', e.name AS 'Ho Ten', e.department AS 'Phong Ban', e.base_salary AS 'Luong Co Ban', a.work_date AS 'Ngay Lam', a.check_in AS 'Gio Vao', a.check_out AS 'Gio Ra', a.ot_hours AS 'Gio Tang Ca' FROM employees e JOIN attendance a ON e.emp_id = a.emp_id;" > ket_qua/BaoCao_TongHop_Full.xls
 
+echo 6. Xuat Staging_Loi_ChiTiet.xls (Tu Staging)...
+docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM staging_records WHERE status = 'INVALID';" > ket_qua/Staging_Loi_ChiTiet.xls
 echo.
 echo =================================================
 echo   ĐÃ HOÀN TẤT! KIỂM TRA THƯ MỤC 'ket_qua'

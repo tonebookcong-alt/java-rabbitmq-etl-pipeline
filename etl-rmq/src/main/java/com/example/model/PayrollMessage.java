@@ -1,12 +1,7 @@
 package com.example.model;
 
-// Đây cũng là một record, nó sẽ được thư viện Jackson tự động chuyển thành JSON
-// Tên các trường (ví dụ: sourceName) sẽ được chuyển thành (source_name)
-// Nhưng để chắc chắn, chúng ta nên dùng lớp (class)
-
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-// Dùng class thay vì record để Jackson có thể set/get
 public class PayrollMessage {
 
     @JsonProperty("source_name")
@@ -21,22 +16,31 @@ public class PayrollMessage {
     @JsonProperty("hash_sha256")
     private String hashSha256;
 
-    @JsonProperty("payload") // Dữ liệu payload có thể là Employee, Attendance...
+    @JsonProperty("payload")
     private Object payload;
 
-    // Constructor, Getters, Setters
-    // Jackson cần constructor rỗng
+    // --- HAI TRƯỜNG MỚI THÊM ---
+    @JsonProperty("status")
+    private String status; // Giá trị sẽ là "VALID" hoặc "INVALID"
+
+    @JsonProperty("error_msg")
+    private String errorMsg; // Lý do lỗi (nếu có)
+
+    // Constructor mặc định (Bắt buộc cho Jackson)
     public PayrollMessage() {}
 
-    public PayrollMessage(String sourceName, String recordType, String businessKey, String hashSha256, Object payload) {
+    // Constructor đầy đủ mới
+    public PayrollMessage(String sourceName, String recordType, String businessKey, String hashSha256, Object payload, String status, String errorMsg) {
         this.sourceName = sourceName;
         this.recordType = recordType;
         this.businessKey = businessKey;
         this.hashSha256 = hashSha256;
         this.payload = payload;
+        this.status = status;
+        this.errorMsg = errorMsg;
     }
 
-    // Getters và Setters (Jackson cần)
+    // --- GETTERS & SETTERS ---
     public String getSourceName() { return sourceName; }
     public void setSourceName(String sourceName) { this.sourceName = sourceName; }
 
@@ -51,4 +55,11 @@ public class PayrollMessage {
 
     public Object getPayload() { return payload; }
     public void setPayload(Object payload) { this.payload = payload; }
+
+    // Getter/Setter cho 2 trường mới
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public String getErrorMsg() { return errorMsg; }
+    public void setErrorMsg(String errorMsg) { this.errorMsg = errorMsg; }
 }

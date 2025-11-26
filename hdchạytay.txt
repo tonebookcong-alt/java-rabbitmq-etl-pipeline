@@ -1,0 +1,132 @@
+xem chi tiết nội dung bảng attendance
+SELECT * FROM attendance_source;
+====================================================
+Giai đoạn 1: Bật Hạ Tầng & Dọn Dẹp 
+
+1. Bật Docker Containers:
+
+Mở Docker Desktop.
+
+Tìm 2 container: rabbitmq-payroll và mysql-payroll.
+
+Nhấn nút Play (▶) để bật chúng lên (đợi chuyển sang màu xanh lá).
+
+2. Dọn sạch dữ liệu cũ (MySQL Workbench):
+
+Mở MySQL Workbench, kết nối vào CSDL payroll.
+
+Mở một tab Query mới, chạy đoạn lệnh này để xóa trắng mọi thứ:
+
+SQL
+
+-- Xóa sạch dữ liệu cũ để chạy demo mới
+TRUNCATE staging_records;
+TRUNCATE dedup_unique;
+TRUNCATE dedup_duplicate;
+TRUNCATE employees;
+TRUNCATE attendance;
+Check: Lúc này các bảng đích sẽ trống rỗng.
+
+3. Dọn sạch Hàng đợi (RabbitMQ Web UI):
+
+Vào trình duyệt: http://localhost:15672 (User/Pass: guest/guest).
+
+Vào tab Queues -> Chọn staging_queue.
+
+Kéo xuống dưới, bấm Purge Messages (nếu có tin nhắn cũ tồn đọng).
+Giai đoạn 2: Chạy Code Java (Extract & Load Staging)
+Chúng ta sẽ chạy từng thành phần trong VS Code.
+
+1. Bật Consumer (Người nhận) trước:
+
+Trong VS Code, mở file: src/main/java/com/example/consumer/StagingConsumer.java.
+
+Nhấn nút Run (▶) ở góc trên bên phải.
+
+Quan sát Terminal: Khi thấy dòng ▶️ Consumer đang chạy... thì để yên đó.
+
+2. Bật Producer (Người gửi) sau:
+
+Trong VS Code, mở file: src/main/java/com/example/RunProducer.java.
+
+Nhấn nút Run (▶).
+
+3. Kiểm tra kết quả tức thời:
+
+Quay lại cửa sổ Consumer, thấy nó chạy liên tục các dòng: ✅ Đã xử lý và INSERT thành công....
+
+Lúc này, 594 bản ghi (297 nhân viên + 297 chấm công) đã nằm trong bảng staging_records.
+
+xem bảng stagingrecord bằng cách
+
+SELECT source_name, COUNT(*) 
+FROM staging_records 
+GROUP BY source_name;
+
+⚙️ Giai đoạn 3: Xử lý Logic (Transform & Deduplicate)
+Lúc này dữ liệu đang ở dạng thô và hỗn độn trong staging_records. Chúng ta cần chạy SQL để lọc và sắp xếp.
+
+Thao tác trong MySQL Workbench:
+
+Mở tab Query mới.
+
+Copy đoạn code sau (Logic chính của đồ án) và nhấn Tia sét 
+--------------------
+
+-- 1. LỌC SẠCH (Tách bản ghi duy nhất)
+INSERT INTO dedup_unique(business_key, record_type, representative_source, payload_json)
+SELECT business_key, record_type, JSON_EXTRACT(sources, '$[0]'), sample_payload
+FROM (
+    SELECT record_type, business_key, COUNT(*) AS cnt, JSON_ARRAYAGG(source_name) AS sources, ANY_VALUE(payload_json) AS sample_payload
+    FROM staging_records GROUP BY record_type, business_key
+) AS grouped WHERE cnt = 1;
+
+-- 2. LỌC TRÙNG (Tách bản ghi trùng lặp để báo cáo)
+INSERT INTO dedup_duplicate(business_key, record_type, conflict_count, sources, sample_payload)
+SELECT business_key, record_type, cnt, sources, sample_payload
+FROM (
+    SELECT record_type, business_key, COUNT(*) AS cnt, JSON_ARRAYAGG(source_name) AS sources, ANY_VALUE(payload_json) AS sample_payload
+    FROM staging_records GROUP BY record_type, business_key
+) AS grouped WHERE cnt > 1;
+
+-- 3. NẠP BẢNG ĐÍCH (Chuyển dữ liệu sạch vào kho chính thức)
+-- Nạp Nhân viên
+INSERT INTO employees (emp_id, name, department, base_salary, allowance)
+SELECT JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.emp_id')), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.name')), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.department')), JSON_EXTRACT(payload_json, '$.base_salary'), JSON_EXTRACT(payload_json, '$.allowance')
+FROM dedup_unique WHERE record_type = 'employees';
+
+-- Nạp Chấm công
+INSERT INTO attendance (emp_id, work_date, check_in, check_out, ot_hours)
+SELECT JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.emp_id')), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.work_date')), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.check_in')), JSON_UNQUOTE(JSON_EXTRACT(payload_json, '$.check_out')), JSON_EXTRACT(payload_json, '$.ot_hours')
+FROM dedup_unique WHERE record_type = 'attendance';
+--------------
+🏆 Giai đoạn 4: Kiểm tra & Xuất Báo cáo (Kết thúc)
+Trong MySQL Workbench, chạy lệnh:
+
+SQL
+
+-- Xem kết quả Nhân viên (Phải ~295 dòng)
+SELECT * FROM employees;
+
+-- Xem kết quả Chấm công (Phải ~295 dòng)
+SELECT * FROM attendance;
+
+-- Xem các bản ghi trùng lặp bị bắt lại (Ví dụ E001, E002)
+SELECT * FROM dedup_duplicate;
+
+--xem bảng tổng hợp từ nhân viên và chấm cônng 
+SELECT 
+    -- 1. Thông tin từ bảng Nhân viên (employees)
+    e.emp_id      AS 'Mã NV',
+    e.name        AS 'Họ Tên',
+    e.department  AS 'Phòng Ban',
+    e.base_salary AS 'Lương Cơ Bản',
+    
+    -- 2. Thông tin từ bảng Chấm công (attendance)
+    a.work_date   AS 'Ngày Làm',
+    a.check_in    AS 'Giờ Vào',
+    a.check_out   AS 'Giờ Ra',
+    a.ot_hours    AS 'Giờ Tăng Ca'
+
+FROM employees e
+JOIN attendance a ON e.emp_id = a.emp_id;

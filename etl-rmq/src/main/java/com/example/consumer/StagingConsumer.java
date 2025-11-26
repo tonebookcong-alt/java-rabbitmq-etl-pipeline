@@ -38,7 +38,7 @@ public class StagingConsumer {
             }
 
             // Chuẩn bị câu lệnh SQL
-            String sql = "INSERT INTO staging_records (source_name, record_type, business_key, hash_sha256, payload_json) VALUES (?, ?, ?, ?, ?)";
+            String sql = "INSERT INTO staging_records (source_name, record_type, business_key, hash_sha256, payload_json, status, error_msg) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
             // PreparedStatement giúp chạy SQL an toàn và hiệu quả
             PreparedStatement pStatement = mysqlConnection.prepareStatement(sql);
@@ -64,7 +64,8 @@ public class StagingConsumer {
                     // 3. Chuyển phần payload (Object) thành JSON (String) để lưu vào CSDL
                     String payloadJson = objectMapper.writeValueAsString(message.getPayload());
                     pStatement.setString(5, payloadJson);
-
+                    pStatement.setString(6, message.getStatus());
+                    pStatement.setString(7, message.getErrorMsg());
                     // 4. Thực thi INSERT
                     pStatement.executeUpdate();
 

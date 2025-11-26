@@ -1,0 +1,2 @@
+business_key	record_type	conflict_count	sources	sample_payload
+E001|2025-10-01	attendance	2	"[""db_attendance"", ""db_attendance""]"	"{""emp_id"": ""E001"", ""check_in"": ""07:04:00"", ""ot_hours"": 1.5, ""check_out"": ""18:51:00"", ""work_date"": ""2025-10-01""}"
