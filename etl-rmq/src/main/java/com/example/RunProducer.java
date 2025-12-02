@@ -1,31 +1,40 @@
 package com.example;
 
-import com.example.producer.AttendanceProducer; // <-- THÊM DÒNG NÀY
+import com.example.producer.AttendanceProducer;
 import com.example.producer.EmployeesProducer;
-
-// 2 dòng này để đóng kết nối
 import com.example.connection.MySQLConnection;
 import com.example.connection.RabbitMQConnection;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class RunProducer {
 
     public static void main(String[] args) {
+        // Sử dụng một ExecutorService để quản lý các luồng chạy song song
+        ExecutorService executor = Executors.newFixedThreadPool(2);
 
-        // ------ 1. CHẠY PRODUCER ĐỌC TỪ CSV (Employees) ------
-        EmployeesProducer empProducer = new EmployeesProducer();
+        try {
+            // Tác vụ 1: Xử lý file employees.csv
+            CompletableFuture<Void> employeeTask = CompletableFuture.runAsync(() -> {
+                               new EmployeesProducer().processFile("data/employees.csv");
+            }, executor);
 
-        String validFilePath = "data/employees.csv";
-        empProducer.processFile(validFilePath);
+            // Tác vụ 2: Xử lý bảng attendance_source
+            CompletableFuture<Void> attendanceTask = CompletableFuture.runAsync(() -> {
+                new AttendanceProducer().processDatabaseSource();
+            }, executor);
 
+            // Đợi cả hai tác vụ hoàn thành
+            CompletableFuture.allOf(employeeTask, attendanceTask).join();
 
-        // ------ 2. CHẠY PRODUCER ĐỌC TỪ TABLE (Attendance) ------
-        AttendanceProducer attProducer = new AttendanceProducer();
-        attProducer.processDatabaseSource(); // <-- GỌI HÀM MỚI
+            System.out.println("--- DA CHAY XONG CA 2 PRODUCER ---");
 
-        System.out.println("--- ĐÃ CHẠY XONG CẢ 2 PRODUCER ---");
-
-        // Đóng kết nối để chương trình kết thúc
-        RabbitMQConnection.close();
-        MySQLConnection.close();
+        } finally {
+            // Tắt executor và đóng các kết nối chung
+            executor.shutdown();
+            RabbitMQConnection.close();
+            MySQLConnection.close();
+        }
     }
 }

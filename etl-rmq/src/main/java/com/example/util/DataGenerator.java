@@ -8,7 +8,7 @@ public class DataGenerator {
 
     public static void main(String[] args) {
         // Đường dẫn file (Lưu vào thư mục data của dự án)
-        String csvFile = "data/employees.csv";
+        String csvFile = "etl-rmq/data/employees.csv";
         
         try (FileWriter writer = new FileWriter(csvFile)) {
             // 1. Viết Header

@@ -40,9 +40,6 @@ public class StagingConsumer {
             // Chuẩn bị câu lệnh SQL
             String sql = "INSERT INTO staging_records (source_name, record_type, business_key, hash_sha256, payload_json, status, error_msg) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-            // PreparedStatement giúp chạy SQL an toàn và hiệu quả
-            PreparedStatement pStatement = mysqlConnection.prepareStatement(sql);
-
             log.info("▶️ Consumer đang chạy. Đang chờ message từ queue: {} ...", QUEUE_NAME);
             log.info("Nhấn (Ctrl+C) để dừng.");
 
@@ -51,7 +48,9 @@ public class StagingConsumer {
                 String messageJson = new String(delivery.getBody(), "UTF-8");
                 long deliveryTag = delivery.getEnvelope().getDeliveryTag();
 
-                try {
+                // Sử dụng try-with-resources để đảm bảo PreparedStatement được đóng sau mỗi lần dùng
+                // Đây là bước sửa lỗi quan trọng nhất
+                try (PreparedStatement pStatement = mysqlConnection.prepareStatement(sql)) {
                     // 1. Chuyển JSON (String) về PayrollMessage (Object)
                     PayrollMessage message = objectMapper.readValue(messageJson, PayrollMessage.class);
 
@@ -60,20 +59,23 @@ public class StagingConsumer {
                     pStatement.setString(2, message.getRecordType());
                     pStatement.setString(3, message.getBusinessKey());
                     pStatement.setString(4, message.getHashSha256());
-
+                    
                     // 3. Chuyển phần payload (Object) thành JSON (String) để lưu vào CSDL
                     String payloadJson = objectMapper.writeValueAsString(message.getPayload());
                     pStatement.setString(5, payloadJson);
                     pStatement.setString(6, message.getStatus());
                     pStatement.setString(7, message.getErrorMsg());
+
                     // 4. Thực thi INSERT
                     pStatement.executeUpdate();
 
                     // 5. Gửi báo cáo "Đã xử lý xong" (ACK) cho RabbitMQ
                     // RabbitMQ sẽ xóa message này khỏi queue
                     rabbitChannel.basicAck(deliveryTag, false);
-                    log.info("✅ Đã xử lý và INSERT thành công message (Key: {})", message.getBusinessKey());
-
+                    
+                    // Giảm bớt log để tránh spam console, bạn có thể bật lại nếu cần
+                    // log.info("✅ Đã xử lý và INSERT thành công message (Key: {})", message.getBusinessKey());
+                    
                 } catch (Exception e) {
                     log.error("❌ Lỗi khi xử lý message: {}", messageJson, e);
                     // Gửi báo cáo "Xử lý lỗi" (NACK)

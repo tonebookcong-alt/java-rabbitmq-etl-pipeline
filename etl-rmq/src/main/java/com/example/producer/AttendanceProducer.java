@@ -43,6 +43,7 @@ public class AttendanceProducer {
             }
 
             Statement statement = mysqlConnection.createStatement();
+            // Lưu ý: Đọc tất cả dưới dạng String để dễ kiểm tra Regex
             ResultSet rs = statement.executeQuery("SELECT ma_nv, ngay_lam, gio_vao, gio_ra, gio_them FROM " + SOURCE_TABLE);
 
             int successCount = 0;
@@ -50,12 +51,14 @@ public class AttendanceProducer {
 
             while (rs.next()) {
                 try {
-                    // Lấy dữ liệu thô
-                    String empId = rs.getString("ma_nv").trim();
-                    String workDate = rs.getString("ngay_lam").trim();
-                    String checkIn = rs.getString("gio_vao").trim();
-                    String checkOut = rs.getString("gio_ra").trim();
-                    double otHours = rs.getDouble("gio_them");
+                    // Lấy dữ liệu thô dưới dạng String
+                    String empId = rs.getString("ma_nv");
+                    if (empId != null) empId = empId.trim();
+                    
+                    String workDate = rs.getString("ngay_lam");
+                    String checkIn = rs.getString("gio_vao");
+                    String checkOut = rs.getString("gio_ra");
+                    String otHoursStr = rs.getString("gio_them"); // Lấy OT dạng chuỗi để check
 
                     // Chuẩn bị biến cho Message
                     String status = "VALID";
@@ -64,11 +67,10 @@ public class AttendanceProducer {
                     String businessKey = "";
                     String hash = "";
 
-                    // --------- 1. VALIDATE (KIỂM TRA) ---------
+                    // --------- 1. VALIDATE TẬP TRUNG (Sử dụng RegexUtil) ---------
                     if (!RegexUtil.isValidEmpId(empId)) {
                         status = "INVALID";
                         errorMsg = "Sai dinh dang ID: " + empId;
-                        // Gửi chuỗi để debug
                         payloadData = String.format("%s|%s", empId, workDate); 
                         businessKey = empId;
                         hash = "NO_HASH";
@@ -80,8 +82,19 @@ public class AttendanceProducer {
                         businessKey = empId;
                         hash = "NO_HASH";
                     }
+                    // --- TÁI SỬ DỤNG REGEXUTIL ĐỂ CHECK SỐ THỰC ---
+                    else if (!RegexUtil.isValidDecimal(otHoursStr)) {
+                        status = "INVALID";
+                        errorMsg = "Gio OT khong hop le: " + otHoursStr;
+                        payloadData = String.format("%s|%s|OT=%s", empId, workDate, otHoursStr);
+                        businessKey = empId;
+                        hash = "NO_HASH";
+                    }
                     else {
                         // --- HỢP LỆ ---
+                        // Ép kiểu an toàn sau khi đã qua Regex
+                        double otHours = Double.parseDouble(otHoursStr);
+                        
                         status = "VALID";
                         Attendance attendance = new Attendance(
                             empId, workDate, checkIn, checkOut, otHours
@@ -91,15 +104,15 @@ public class AttendanceProducer {
                         hash = HashUtil.sha256(attendance.toCanonicalString());
                     }
 
-                    // --------- 2. ĐÓNG GÓI MESSAGE (Sửa lỗi ở đây: Dùng 7 tham số) ---------
+                    // --------- 2. ĐÓNG GÓI MESSAGE ---------
                     PayrollMessage message = new PayrollMessage(
                         SOURCE_NAME,
                         ROUTING_KEY,
                         businessKey,
                         hash,
                         payloadData,
-                        status,    // <-- Mới thêm
-                        errorMsg   // <-- Mới thêm
+                        status,
+                        errorMsg
                     );
 
                     String messageJson = objectMapper.writeValueAsString(message);

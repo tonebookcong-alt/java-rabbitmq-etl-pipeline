@@ -1,95 +1,96 @@
 @echo off
 chcp 65001 >nul
-title Hệ Thống Tích Hợp Dữ Liệu
+title HE THONG TICH HOP DU LIEU (ETL Pipeline)
 color 0E
 
 echo =================================================
-echo  Bước 1: Khởi động hạ tầng (Docker) 
+echo   GIAI DOAN 1: KHOI DONG HA TANG (DOCKER)
 echo =================================================
 
-echo Đang kiểm tra docker...
+echo Dang kiem tra Docker...
 docker info >nul 2>&1
 if %errorlevel% neq 0 (
     color 0C
-    echo [LOI] Docker chưa bật hãy bật docker trước
+    echo [LOI] Docker chua bat! Hay bat Docker Desktop truoc.
     pause
     exit
 )
 
-echo [OK] Đang bật container...
+echo [OK] Dang bat Container...
 docker start rabbitmq-payroll
 docker start mysql-payroll
 
 echo.
 echo =================================================
-echo   Bước 2: Dọn dẹp dữ liệu cũ
+echo   GIAI DOAN 2: DON DEP DU LIEU CU
 echo =================================================
 echo.
 
-echo Đang xóa sạch bảng Staging để tránh trùng lặp ảo...
-:: lệnh này sẽ xóa trắng bảng trung gian trước khi nạp mới
-docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "TRUNCATE TABLE staging_records;"
+echo 1. Dang xoa sach du lieu trong CSDL...
+docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SET FOREIGN_KEY_CHECKS = 0; TRUNCATE TABLE staging_records; TRUNCATE TABLE dedup_unique; TRUNCATE TABLE dedup_duplicate; TRUNCATE TABLE employees; TRUNCATE TABLE attendance; SET FOREIGN_KEY_CHECKS = 1;"
+echo [OK] CSDL da sach se.
 
-echo [OK] Kho trung gian đã sạch sẽ. Sẵn sàng nạp mới.
+echo 2. Dang xoa sach tin nhan trong RabbitMQ...
+docker exec rabbitmq-payroll rabbitmqadmin purge queue name=staging_queue
+echo [OK] Hang doi (Queue) da sach se.
 
 echo.
 echo =================================================
-echo   Bước 3: Chạy code Java (ETL)
+echo   GIAI DOAN 3: CHAY CODE JAVA (EXTRACT ^& LOAD TO STAGING)
 echo =================================================
 echo.
 
 cd /d "%~dp0"
 cd etl-rmq
 
-:: Kiem tra file JAR
 if not exist "target\etl-rmq-1.0-SNAPSHOT.jar" (
     color 0C
-    echo [LOI] Không tìm thấy file JAR! Hãy chạy 'mvn package' lại.
+    echo [LOI] Khong tim thay file JAR! Hay chay 'mvn package' lai.
     pause
     exit
 )
 
-echo 1. Đang khởi động CONSUMER...
+echo 1. Dang khoi dong CONSUMER...
 start "BEN NHAN (Consumer)" java -cp target/etl-rmq-1.0-SNAPSHOT.jar com.example.consumer.StagingConsumer
 
 echo.
-echo 2. Đang khởi động PRODUCER...
+echo 2. Dang khoi dong PRODUCER...
 java -cp target/etl-rmq-1.0-SNAPSHOT.jar com.example.RunProducer
 
 echo.
-echo    -> Cho 5 giây để dữ liệu nạp vào DB...
-timeout /t 5 /nobreak >nul
-
+echo    -> Cho 10 giay de du lieu nap vao DB...
+timeout /t 10 /nobreak >nul
 echo.
 echo =================================================
-echo   Bước 4: Xử lý logic và xuất báo cáo
+echo   GIAI DOAN 4: XU LY LOGIC VA XUAT BAO CAO
 echo =================================================
 echo.
 
-:: Chạy file SQL xử lý
+echo Dang chay SQL de loc trung va nap du lieu...
 docker exec -i mysql-payroll mysql -u root -p123456 payroll < process_data.sql
-echo [OK] Đã lọc trùng và nạp bảng đích.
+echo [OK] Da xu ly xong du lieu trong CSDL.
 
-:: Tạo thư mục ket_qua
+echo.
+echo Dang xuat cac file bao cao...
 if not exist "ket_qua" mkdir ket_qua
 
-echo 1. Xuất BaoCao_NhanVien.xls ...
-docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM employees;" > ket_qua/BaoCao_NhanVien.xls
+echo   1. Xuat BaoCao_NhanVien.xls ...
+docker exec -i mysql-payroll mysql -N -B -u root -p123456 payroll -e "SELECT * FROM employees;" > ket_qua/BaoCao_NhanVien.xls
 
-echo 2. Xuất BaoCao_ChamCong.xls ...
-docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM attendance;" > ket_qua/BaoCao_ChamCong.xls
+echo   2. Xuat BaoCao_ChamCong.xls ...
+docker exec -i mysql-payroll mysql -N -B -u root -p123456 payroll -e "SELECT * FROM attendance;" > ket_qua/BaoCao_ChamCong.xls
 
-echo 3. Xuất BaoCao_Loi_TrungLap.xls ...
-docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM dedup_duplicate;" > ket_qua/BaoCao_Loi_TrungLap.xls
+echo   3. Xuat BaoCao_Loi_TrungLap.xls ...
+docker exec -i mysql-payroll mysql -N -B -u root -p123456 payroll -e "SELECT * FROM dedup_duplicate;" > ket_qua/BaoCao_Loi_TrungLap.xls
 
-echo 4. Xuất BaoCao_TongHop_Full.xls (Mới) ...
-:: Lệnh này thực hiện JOIN 2 bảng và xuất ra file
-docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT e.emp_id AS 'Ma NV', e.name AS 'Ho Ten', e.department AS 'Phong Ban', e.base_salary AS 'Luong Co Ban', a.work_date AS 'Ngay Lam', a.check_in AS 'Gio Vao', a.check_out AS 'Gio Ra', a.ot_hours AS 'Gio Tang Ca' FROM employees e JOIN attendance a ON e.emp_id = a.emp_id;" > ket_qua/BaoCao_TongHop_Full.xls
+echo   4. Xuat BaoCao_Loi_DinhDang.xls ...
+docker exec -i mysql-payroll mysql -N -B -u root -p123456 payroll -e "SELECT * FROM staging_records WHERE status = 'INVALID';" > ket_qua/BaoCao_Loi_DinhDang.xls
 
-echo 6. Xuat Staging_Loi_ChiTiet.xls (Tu Staging)...
-docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT * FROM staging_records WHERE status = 'INVALID';" > ket_qua/Staging_Loi_ChiTiet.xls
+echo   5. Xuat BaoCao_TongHop_Full.xls ...
+docker exec -i mysql-payroll mysql -u root -p123456 payroll -e "SELECT 'Ma NV', 'Ho Ten', 'Phong Ban', 'Luong Co Ban', 'Ngay Lam', 'Gio Vao', 'Gio Ra', 'Gio Tang Ca' UNION ALL SELECT e.emp_id, e.name, e.department, e.base_salary, a.work_date, a.check_in, a.check_out, a.ot_hours FROM employees e JOIN attendance a ON e.emp_id = a.emp_id;" > ket_qua/BaoCao_TongHop_Full.xls
+
 echo.
 echo =================================================
-echo   ĐÃ HOÀN TẤT! KIỂM TRA THƯ MỤC 'ket_qua'
+echo   DA HOAN TAT! KIEM TRA THU MUC 'ket_qua'
 echo =================================================
 pause

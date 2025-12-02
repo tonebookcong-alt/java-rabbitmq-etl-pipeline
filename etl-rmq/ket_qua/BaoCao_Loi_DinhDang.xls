@@ -1,0 +1,8 @@
+1	csv_employees	employees	ý?asd	NO_HASH	"[""ý?asd"", ""Nhan Vien 1"", ""HR"", ""23908020"", ""1594558""]"	INVALID	Sai dinh dang ID: ï¿½?a	12/2/2025 20:33
+2	csv_employees	employees	E002	NO_HASH	"[""E002"", ""Nhan Vien 2"", ""HR"", ""?f11631934"", ""3659592""]"	INVALID	Luong khong phai la so: ?f11631934	12/2/2025 20:33
+3	csv_employees	employees	ERROR_1764707599594	NO_HASH	"[""E003"", ""Nhan Vien 3Finance"", ""22178001"", ""4586614""]"	INVALID	Du lieu thieu cot	12/2/2025 20:33
+296	csv_employees	employees	BAD_ID_123	NO_HASH	"[""BAD_ID_123"", ""Ke Gian"", ""Hack"", ""999999"", ""0""]"	INVALID	Sai dinh dang ID: BAD_ID_123	12/2/2025 20:33
+298	csv_employees	employees	E@#$	NO_HASH	"[""E@#$"", ""Ky Tu La"", ""IT"", ""10000000"", ""500000""]"	INVALID	Sai dinh dang ID: E@#$	12/2/2025 20:33
+596	db_attendance	attendance	BAD-ID-01	NO_HASH	BAD-ID-01|2025-10-01	INVALID	Sai dinh dang ID: BAD-ID-01	12/2/2025 20:33
+597	db_attendance	attendance	E@ERROR	NO_HASH	E@ERROR|2025-10-02	INVALID	Sai dinh dang ID: E@ERROR	12/2/2025 20:33
+598	db_attendance	attendance	NO_USER	NO_HASH	NO_USER|2025-10-03	INVALID	Sai dinh dang ID: NO_USER	12/2/2025 20:33
